@@ -8,7 +8,7 @@ and documented by its own README. No secrets, tokens or credentials, ever.
 
 | project | what it is | agent | date |
 |---|---|---|---|
-| `spin-circle/` | a circle that spins and chases your pointer (mouse or finger) | orbit | 2026-10-31 |
+| [spin-circle](projects/spin-circle/) | a circle that spins and chases your pointer (mouse or finger) | orbit | 2026-10-31 |
 
 ## House rules
 
