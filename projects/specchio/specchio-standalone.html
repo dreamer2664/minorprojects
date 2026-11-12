@@ -1,9 +1,9 @@
 <!DOCTYPE html>
 <!--
   SPECCHIO — build standalone
-  generato: 2026-11-12 13:07
+  generato: 2026-11-12 15:08
   asset inline: 5 font · 3 immagini · 6 script
-  impronta: 020328c36463
+  impronta: a4b6d4a3f46e
   nessuna richiesta di rete a runtime
 -->
 
@@ -1414,19 +1414,19 @@ var k="1.1.14";function w(r,t,e){return Math.max(r,Math.min(t,e))}function _(r,t
     { shape: 0, spread: 2.9, size: 2.4, bg: 1.00, tint: 0.55 }, // 00 nascita
     { shape: 1, spread: 2.1, size: 2.2, bg: 0.85, tint: 0.70 }, // 01 genesi
     { shape: 7, spread: 2.4, size: 1.7, bg: 0.55, tint: 0.50 }, // 02 manifesto
-    { shape: 9, spread: 1.9, size: 2.6, bg: 0.70, tint: 0.85 }, // 03 materia
+    { shape: 9, spread: 1.55, size: 2.4, bg: 0.70, tint: 0.85 }, // 03 materia
     { shape: 3, spread: 2.4, size: 1.8, bg: 0.52, tint: 0.90 }, // 04 scacco
     { shape: 4, spread: 2.2, size: 2.0, bg: 0.75, tint: 0.75 }, // 05 scala
     { shape: 5, spread: 2.6, size: 1.7, bg: 0.42, tint: 0.45 }, // 06 specie
     { shape: 7, spread: 2.2, size: 1.4, bg: 0.30, tint: 0.40 }, // 07 riflesso
     { shape: 7, spread: 2.6, size: 1.8, bg: 0.45, tint: 0.55 }, // 08 prova
     { shape: 6, spread: 2.5, size: 2.3, bg: 0.70, tint: 0.80 }, // 09 sogno
-    { shape: 6, spread: 2.5, size: 2.2, bg: 0.72, tint: 0.85 }, // 10 frase madre
+    { shape: 6, spread: 2.1, size: 2.1, bg: 0.72, tint: 0.85 }, // 10 frase madre
     { shape: 2, spread: 2.2, size: 1.5, bg: 0.30, tint: 0.45 }, // 11 controllo
     { shape: 7, spread: 2.5, size: 1.8, bg: 0.45, tint: 0.55 }, // 12 principio
     { shape: 5, spread: 2.5, size: 1.8, bg: 0.52, tint: 0.70 }, // 13 numeri
     { shape: 7, spread: 1.6, size: 1.2, bg: 0.22, tint: 0.35 }, // 14 pausa
-    { shape: 9, spread: 2.1, size: 2.8, bg: 1.00, tint: 1.00 }, // 15 specchio
+    { shape: 9, spread: 1.35, size: 2.5, bg: 1.00, tint: 1.00 }, // 15 specchio
   ];
 
   if (!gl) {
@@ -1683,6 +1683,7 @@ uniform float uTime;
 uniform float uIntensity;
 uniform vec2 uMouse;
 uniform vec2 uRes;
+uniform float uBurst;    // alone che si accende durante il cambio d'atto
 
 float hash(vec2 p){
   p = fract(p * vec2(123.34, 456.21));
@@ -1722,10 +1723,15 @@ void main(){
   float vapor = fbm(p * 2.6 + vec2(t * 1.6, -t * 1.1));
   vapor = smoothstep(0.40, 0.96, vapor) * 0.22;
 
+  // alone centrale: la luce che accende la polvere
+  float aura = 0.055 / (0.10 + dot(p, p) * 2.2);
+  aura *= 0.6 + uBurst * 1.9;
+
   vec3 gold = vec3(0.74, 0.58, 0.35);
   vec3 base = vec3(0.012, 0.011, 0.010);
   vec3 col = base;
   col += gold * glow * uIntensity;
+  col += vec3(0.92, 0.80, 0.60) * aura * uIntensity * 0.55;
   col += vec3(0.05, 0.045, 0.038) * vapor * uIntensity;
   col += gold * vapor * 0.05 * uIntensity;
 
@@ -1734,6 +1740,111 @@ void main(){
   col *= mix(0.55, 1.0, vig);
 
   gl_FragColor = vec4(col, 1.0);
+}
+`;
+
+  // ——— post-processing ———
+  const QUAD_VERT = `
+attribute vec2 aPos;
+varying vec2 vUv;
+void main(){
+  vUv = aPos * 0.5 + 0.5;
+  gl_Position = vec4(aPos, 0.0, 1.0);
+}
+`;
+
+  // accumulo: la scena si somma al frame precedente, che evapora piano
+  const ACC_FRAG = `
+precision mediump float;
+varying vec2 vUv;
+uniform sampler2D uPrev;
+uniform sampler2D uScene;
+uniform float uFade;     // quanto resta del passato (0.78 = scie lunghe)
+uniform vec2  uZoom;     // micro-zoom: le scie si allargano verso l'esterno
+uniform vec2  uShift;    // scia direzionale: segue scroll e mouse
+void main(){
+  vec2 uv = vUv;
+  vec2 c = uv - 0.5;
+  vec2 puv = 0.5 + c * uZoom + uShift;
+  vec4 prev = texture2D(uPrev, puv);
+
+  // le scie evaporano di più verso i bordi: niente sbavature sui contorni
+  float edge = smoothstep(0.5, 0.34, max(abs(c.x), abs(c.y)));
+  vec3 acc = prev.rgb * uFade * mix(0.55, 1.0, edge);
+
+  vec3 scene = texture2D(uScene, uv).rgb;
+  vec3 col = acc + scene;
+
+  // compressione morbida: gli alti si piegano, le scie mantengono gradiente
+  col = col / (1.0 + col * 0.55);
+
+  gl_FragColor = vec4(col, 1.0);
+}
+`;
+
+  // composizione: bloom soft, aberrazione cromatica, grana, vignetta
+  const OUT_FRAG = `
+precision mediump float;
+varying vec2 vUv;
+uniform sampler2D uTex;
+uniform vec2  uRes;
+uniform float uTime;
+uniform float uWarp;     // 0..1 → separazione dei canali
+uniform float uBloom;
+uniform float uBloomQ;   // 1 = 10 tap (ricco) · 0.45 = 4 tap (economico)
+uniform float uExposure;
+
+float hash21(vec2 p){
+  p = fract(p * vec2(123.34, 456.21));
+  p += dot(p, p + 45.32);
+  return fract(p.x * p.y);
+}
+
+void main(){
+  vec2 uv = vUv;
+  vec2 c = uv - 0.5;
+  float r2 = dot(c, c);
+
+  // aberrazione: i canali si separano ai bordi e con lo "warp"
+  float amt = (0.0007 + uWarp * 0.0035) * (0.30 + r2 * 2.0);
+  vec2 dir = normalize(c + 0.0001) * amt;
+  float cr = texture2D(uTex, uv + dir).r;
+  vec2 ga = texture2D(uTex, uv).ga;
+  float cb = texture2D(uTex, uv - dir).b;
+  vec3 col = vec3(cr, ga.x, cb);
+
+  // bloom: due anelli, oppure quattro tap larghi quando serve leggerezza
+  vec3 bloom = vec3(0.0);
+  if (uBloomQ > 0.75) {
+    for (int i = 0; i < 6; i++){
+      float a = float(i) * 1.0471976;
+      vec2 o1 = vec2(cos(a), sin(a)) * 0.0050;
+      vec2 o2 = vec2(cos(a + 0.5), sin(a + 0.5)) * 0.0140;
+      bloom += texture2D(uTex, uv + o1).rgb;
+      bloom += texture2D(uTex, uv + o2).rgb * 0.55;
+    }
+    bloom /= 9.3;
+  } else {
+    bloom += texture2D(uTex, uv + vec2( 0.010,  0.004)).rgb;
+    bloom += texture2D(uTex, uv + vec2(-0.010, -0.004)).rgb;
+    bloom += texture2D(uTex, uv + vec2( 0.003, -0.012)).rgb;
+    bloom += texture2D(uTex, uv + vec2(-0.003,  0.012)).rgb;
+    bloom *= 0.25;
+  }
+  // solo le zone luminose fioriscono
+  float lum = dot(bloom, vec3(0.299, 0.587, 0.114));
+  bloom *= smoothstep(0.18, 0.85, lum) * uBloom;
+  col += bloom * vec3(1.0, 0.93, 0.80);
+
+  // tone map filmica: gli alti si piegano, i neri restano neri
+  col = 1.0 - exp(-col * uExposure);
+
+  // vignetta e grana finissima
+  col *= mix(0.62, 1.0, smoothstep(0.92, 0.18, length(c)));
+  float g = hash21(uv * uRes + fract(uTime) * 91.7) - 0.5;
+  col += g * 0.022;
+
+  gl_FragColor = vec4(max(col, 0.0), 1.0);
 }
 `;
 
@@ -1774,7 +1885,9 @@ void main(){
 
   const progParticles = program(VERT, FRAG);
   const progBg = program(BG_VERT, BG_FRAG);
-  if (!progParticles || !progBg) {
+  const progAcc = program(QUAD_VERT, ACC_FRAG);
+  const progOut = program(QUAD_VERT, OUT_FRAG);
+  if (!progParticles || !progBg || !progAcc || !progOut) {
     window.SpecchioGL = { setScene() {}, setMouse() {}, setScrollVel() {}, get active() { return false; } };
     return;
   }
@@ -1795,6 +1908,45 @@ void main(){
   const quadBuf = gl.createBuffer();
   gl.bindBuffer(gl.ARRAY_BUFFER, quadBuf);
   gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
+
+  /* ───────────── framebuffer per il post ───────────── */
+
+  function makeTarget(w, h) {
+    const tex = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, tex);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, w, h, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    const fb = gl.createFramebuffer();
+    gl.bindFramebuffer(gl.FRAMEBUFFER, fb);
+    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, tex, 0);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    return { tex, fb, w, h };
+  }
+
+  let sceneT = makeTarget(2, 2);
+  let accA = makeTarget(2, 2);
+  let accB = makeTarget(2, 2);
+  let useA = true;
+
+  const PU = {
+    accPrev: gl.getUniformLocation(progAcc, 'uPrev'),
+    accScene: gl.getUniformLocation(progAcc, 'uScene'),
+    accFade: gl.getUniformLocation(progAcc, 'uFade'),
+    accZoom: gl.getUniformLocation(progAcc, 'uZoom'),
+    accShift: gl.getUniformLocation(progAcc, 'uShift'),
+    outTex: gl.getUniformLocation(progOut, 'uTex'),
+    outRes: gl.getUniformLocation(progOut, 'uRes'),
+    outTime: gl.getUniformLocation(progOut, 'uTime'),
+    outWarp: gl.getUniformLocation(progOut, 'uWarp'),
+    outBloom: gl.getUniformLocation(progOut, 'uBloom'),
+    outBloomQ: gl.getUniformLocation(progOut, 'uBloomQ'),
+    outExposure: gl.getUniformLocation(progOut, 'uExposure'),
+  };
+  const quadLocAcc = gl.getAttribLocation(progAcc, 'aPos');
+  const quadLocOut = gl.getAttribLocation(progOut, 'aPos');
 
   const U = {
     time: gl.getUniformLocation(progParticles, 'uTime'),
@@ -1840,6 +1992,15 @@ void main(){
   let burst = 0;      // onda di transizione
   let explode = 0;    // deformazione da scroll
   let scrollEnergy = 0;
+  let scrollDir = 0;      // -1 su, +1 giù
+  let trailX = 0, trailY = 0;   // scia direzionale (unità di UV)
+
+  // qualità adattiva: se il frame time peggiora, il pipeline si semplifica da solo
+  const prefersReduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  let quality = (typeof window.__SPECCHIO_Q === 'number') ? window.__SPECCHIO_Q : (prefersReduce ? 0 : 2);
+  const qLocked = (typeof window.__SPECCHIO_Q === 'number');
+  let frameAvg = 16;
+  let qCooldown = 0;
 
   function resize() {
     dpr = Math.min(window.devicePixelRatio || 1, 1.75);
@@ -1850,6 +2011,15 @@ void main(){
     canvas.style.width = w + 'px';
     canvas.style.height = h + 'px';
     gl.viewport(0, 0, canvas.width, canvas.height);
+    {
+      const w = canvas.width, h = canvas.height;
+      [sceneT, accA, accB].forEach((t) => {
+        if (!t) return;
+        gl.bindTexture(gl.TEXTURE_2D, t.tex);
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, w, h, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+        t.w = w; t.h = h;
+      });
+    }
   }
 
   function lerp(a, b, t) { return a + (b - a) * t; }
@@ -1860,7 +2030,17 @@ void main(){
     const dt = Math.min((now - last) / 1000, 0.05);
     last = now;
     const time = now * 0.001;
+    const ms = dt * 1000;
 
+    // misura il frame e adegua la qualità (con isteresi, per non oscillare)
+    frameAvg = frameAvg * 0.94 + ms * 0.06;
+    qCooldown -= dt;
+    if (qCooldown <= 0 && !qLocked) {
+      if (frameAvg > 24 && quality > 0) { quality--; qCooldown = 2.5; }
+      else if (frameAvg < 13 && quality < 2) { quality++; qCooldown = 4.0; }
+    }
+
+    state.mousePrevX = mouseL.x;
     mouseL.x = lerp(mouseL.x, state.mouseT.x, 0.045);
     mouseL.y = lerp(mouseL.y, state.mouseT.y, 0.045);
 
@@ -1884,6 +2064,9 @@ void main(){
     }
     intensity = lerp(intensity, cur.bg, 0.03);
 
+    // ── passo 1: la scena vive in una texture ──
+    gl.bindFramebuffer(gl.FRAMEBUFFER, sceneT.fb);
+    gl.viewport(0, 0, sceneT.w, sceneT.h);
     gl.clearColor(0, 0, 0, 0);
     gl.clear(gl.COLOR_BUFFER_BIT);
 
@@ -1897,6 +2080,7 @@ void main(){
     gl.uniform1f(B.intensity, intensity * 0.82);
     gl.uniform2f(B.mouse, mouseL.x, mouseL.y);
     gl.uniform2f(B.res, canvas.width, canvas.height);
+    gl.uniform1f(B.burst, burst);
     gl.drawArrays(gl.TRIANGLES, 0, 3);
 
     // particelle
@@ -1921,6 +2105,77 @@ void main(){
     gl.uniform1f(U.burst, burst * burst * (3 - 2 * burst));
     gl.uniform1f(U.explode, explode);
     gl.drawArrays(gl.POINTS, 0, COUNT);
+
+    if (quality === 0) {
+      // qualità bassa: la scena va dritta a schermo, senza post
+      gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+      gl.viewport(0, 0, canvas.width, canvas.height);
+      gl.disable(gl.BLEND);
+      gl.useProgram(progOut);
+      gl.bindBuffer(gl.ARRAY_BUFFER, quadBuf);
+      gl.enableVertexAttribArray(quadLocOut);
+      gl.vertexAttribPointer(quadLocOut, 2, gl.FLOAT, false, 0, 0);
+      gl.activeTexture(gl.TEXTURE0);
+      gl.bindTexture(gl.TEXTURE_2D, sceneT.tex);
+      gl.uniform1i(PU.outTex, 0);
+      gl.uniform2f(PU.outRes, canvas.width, canvas.height);
+      gl.uniform1f(PU.outTime, time);
+      gl.uniform1f(PU.outWarp, 0);
+      gl.uniform1f(PU.outBloom, 0);
+      gl.uniform1f(PU.outExposure, 1.55);
+      gl.drawArrays(gl.TRIANGLES, 0, 3);
+      vel *= 0.92;
+      requestAnimationFrame(render);
+      return;
+    }
+
+    // ── passo 2: accumulo con evaporazione → scie ──
+    const prevT = useA ? accA : accB;
+    const nextT = useA ? accB : accA;
+    gl.bindFramebuffer(gl.FRAMEBUFFER, nextT.fb);
+    gl.viewport(0, 0, nextT.w, nextT.h);
+    gl.disable(gl.BLEND);
+    gl.useProgram(progAcc);
+    gl.bindBuffer(gl.ARRAY_BUFFER, quadBuf);
+    gl.enableVertexAttribArray(quadLocAcc);
+    gl.vertexAttribPointer(quadLocAcc, 2, gl.FLOAT, false, 0, 0);
+    gl.activeTexture(gl.TEXTURE1);
+    gl.bindTexture(gl.TEXTURE_2D, prevT.tex);
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, sceneT.tex);
+    gl.uniform1i(PU.accPrev, 1);
+    gl.uniform1i(PU.accScene, 0);
+    // lo scroll accorcia le scie (più velocità = più energia, meno memoria)
+    const fade = 0.80 + Math.min(0.06, scrollEnergy * 0.04) + burst * 0.05;
+    gl.uniform1f(PU.accFade, Math.min(0.90, fade));
+    const zoom = 1 + 0.0006 + scrollEnergy * 0.0010 + burst * 0.0022;
+    gl.uniform2f(PU.accZoom, zoom, zoom);
+    // la scia insegue il movimento reale: giù quando scorri giù, e segue il mouse
+    const targetShiftY = scrollDir * Math.min(0.006, scrollEnergy * 0.0035);
+    const targetShiftX = (mouseL.x - (state.mousePrevX || 0)) * -0.0004;
+    trailY = lerp(trailY, targetShiftY, 0.12);
+    trailX = lerp(trailX, targetShiftX, 0.12);
+    gl.uniform2f(PU.accShift, trailX, trailY);
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
+    useA = !useA;
+
+    // ── passo 3: composizione finale a schermo ──
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    gl.viewport(0, 0, canvas.width, canvas.height);
+    gl.useProgram(progOut);
+    gl.bindBuffer(gl.ARRAY_BUFFER, quadBuf);
+    gl.enableVertexAttribArray(quadLocOut);
+    gl.vertexAttribPointer(quadLocOut, 2, gl.FLOAT, false, 0, 0);
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, nextT.tex);
+    gl.uniform1i(PU.outTex, 0);
+    gl.uniform2f(PU.outRes, canvas.width, canvas.height);
+    gl.uniform1f(PU.outTime, time);
+    gl.uniform1f(PU.outWarp, Math.min(1, scrollEnergy * 0.22 + burst * 0.45));
+    gl.uniform1f(PU.outBloom, quality >= 2 ? 0.55 : 0.42);
+    gl.uniform1f(PU.outBloomQ, quality >= 2 ? 1 : 0);
+    gl.uniform1f(PU.outExposure, 1.55);
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
 
     vel *= 0.92;
     requestAnimationFrame(render);
@@ -1950,6 +2205,7 @@ void main(){
     setScrollVel(v) {
       vel = Math.min(Math.abs(v) * 0.02, 3.0);
       scrollEnergy = Math.min(1.6, Math.abs(v) * 0.006);
+      if (v !== 0) scrollDir = v > 0 ? 1 : -1;
     },
     burst() { burst = 1; },
   };

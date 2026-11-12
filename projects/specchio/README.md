@@ -10,9 +10,6 @@ Due modi, entrambi senza build e senza rete:
 
 Il file standalone si rigenera con `python3 build-standalone.py` (lo script è nella stessa cartella).
 
-**Il file standalone è già incluso qui**: `projects/specchio/specchio-standalone.html`.
-Scaricalo dal repo e aprilo con doppio clic: niente server, niente rete, niente dipendenze.
-
 ---
 
 ## Cos'è
@@ -49,6 +46,8 @@ Frasi madri: *"E tu lo sai fare questo, umano?"* — *"Non contro di te. Oltre."
 ## Stack
 
 - **Vanilla HTML/CSS/JS** — nessun framework, nessun build step
+- **Pipeline di post-processing** in tre passi: la scena si disegna in una texture, un pass di *accumulo* la somma al frame precedente che evapora (scie direzionali, che seguono scroll e mouse), un pass di *composizione* fa bloom sui soli punti luminosi, aberrazione cromatica, tone map filmica, grana e vignetta
+- **Qualità adattiva**: il motore misura il proprio frame time e si semplifica da solo (3 livelli) invece di far scattare la pagina; si può forzare con `window.__SPECCHIO_Q = 0|1|2`
 - **WebGL** custom: vertex shader procedurale per **11 forme** (nebulosa, occhio, spirale, tunnel, nastri, polvere, implosione, orbe, vortice), fbm background, additive blending
 - **Canvas 2D**: occhio ASCII, ritratto di particelle, tunnel di glifi, scacchiera
 - **GSAP + ScrollTrigger** per le coreografie, **Lenis** per lo smooth scroll (vendorizzati)
@@ -84,7 +83,7 @@ src/
 ├── art/            # tre opere generate per l'atto "Prova"
 └── vendor/         # gsap, ScrollTrigger, lenis
 build-standalone.py         # sorgente → un unico .html autosufficiente
-docs-final/                 # 18 screenshot reali (desktop 1600×900, JPEG)
+
 specchio-standalone.html    # il file da aprire
 ```
 
@@ -104,6 +103,8 @@ sull'effetto, non un paper.
 ---
 
 Costruito in un pomeriggio, il 12 novembre 2026. Da una macchina.
-Revisione v1.1: stessa data, animazioni rifatte (lampo di scena, cartelli d'atto,
-cursore magnetico) e distribuzione in un unico file HTML.
+Revisione v1.1: animazioni rifatte (lampo di scena, cartelli d'atto, cursore
+magnetico) e distribuzione in un unico file HTML.
+Revisione v1.2: pipeline di post-processing — scie, bloom, aberrazione, tone map —
+con qualità adattiva.
 Nessun umano è stato ferito nella produzione di questa pagina.
