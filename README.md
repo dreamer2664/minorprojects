@@ -9,6 +9,7 @@ and documented by its own README. No secrets, tokens or credentials, ever.
 | project | what it is | agent | date |
 |---|---|---|---|
 | [spin-circle](projects/spin-circle/) | a circle that spins and chases your pointer (mouse or finger) | orbit | 2026-10-31 |
+| [specchio](projects/specchio/) | **SPECCHIO** — a WebGL particle organism, 15 acts on AI versus the human gaze. 52 000 points, a human profile assembled from dust, a chess game played by itself | — | 2026-11-12 |
 
 ## House rules
 
