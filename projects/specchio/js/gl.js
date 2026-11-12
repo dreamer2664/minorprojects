@@ -35,7 +35,7 @@
     { shape: 7, spread: 2.6, size: 1.8, bg: 0.45, tint: 0.55 }, // 08 prova
     { shape: 6, spread: 2.5, size: 2.3, bg: 0.70, tint: 0.80 }, // 09 sogno
     { shape: 6, spread: 2.5, size: 2.2, bg: 0.72, tint: 0.85 }, // 10 frase madre
-    { shape: 2, spread: 2.3, size: 1.7, bg: 0.45, tint: 0.50 }, // 11 controllo
+    { shape: 2, spread: 2.2, size: 1.5, bg: 0.30, tint: 0.45 }, // 11 controllo
     { shape: 7, spread: 2.5, size: 1.8, bg: 0.45, tint: 0.55 }, // 12 principio
     { shape: 5, spread: 2.5, size: 1.8, bg: 0.52, tint: 0.70 }, // 13 numeri
     { shape: 7, spread: 1.6, size: 1.2, bg: 0.22, tint: 0.35 }, // 14 pausa
@@ -69,6 +69,8 @@ uniform float uPR;
 uniform float uSize;
 uniform float uSpread;
 uniform float uTint;
+uniform float uBurst;    // onda di transizione tra atti (0..1)
+uniform float uExplode;  // deformazione legata alla velocità di scroll (0..1)
 
 varying vec3 vColor;
 varying float vAlpha;
@@ -166,13 +168,23 @@ vec3 shapePos(float s, vec3 seed, float t, float prog){
     float ang = th + swirl;
     return vec3(sin(ph) * cos(ang), cos(ph), sin(ph) * sin(ang)) * r;
   }
-  else {
+  else if (s < 9.5) {
     // 9 · orbe: sfera precisa in lenta rotazione
     float th = shapeH(seed, 16.0) * TAU;
     float ph = acos(2.0 * shapeH(seed, 17.0) - 1.0);
     vec3 dir = vec3(sin(ph) * cos(th), cos(ph), sin(ph) * sin(th));
     float r = 1.30 + (shapeH(seed, 18.0) - 0.5) * 0.07;
     return dir * r;
+  }
+  else {
+    // 10 · vortice: disco a bracci rotanti, ottimo per le transizioni
+    float a = shapeH(seed, 19.0) * TAU;
+    float k = fract(h * 5.0);
+    float rr = 0.22 + sqrt(k) * 1.34;
+    float arms = sin(a * 3.0 + rr * 4.2 - t * 0.9) * 0.5 + 0.5;
+    float z = (shapeH(seed, 20.0) - 0.5) * (0.30 + arms * 0.55) - 0.14;
+    float ang = a + rr * 1.15 + t * 0.10;
+    return vec3(cos(ang) * rr * 1.18, sin(ang) * rr * 0.92, z);
   }
 }
 
@@ -181,6 +193,7 @@ mat4 rotY(float a){ float c = cos(a), s = sin(a); return mat4(c,0.,-s,0., 0.,1.,
 
 void main(){
   vec3 seed = aSeed;
+  float h = seed.x;
   float h2 = seed.y;
   float h3 = seed.z;
 
@@ -204,13 +217,27 @@ void main(){
     sin(uTime * 0.38 + seed.x * 13.0)
   ) * 0.028;
 
+  // onda di transizione: le particelle si aprono e tornano
+  if (uBurst > 0.001) {
+    float ang0 = h * TAU + h2 * 2.4;
+    vec3 dirB = normalize(vec3(cos(ang0), (h2 - 0.5) * 1.7, sin(ang0)) + 0.0001);
+    p += dirB * uBurst * (0.16 + h3 * 0.24);
+  }
+
+  // scroll veloce → il sistema respira verso l'esterno
+  if (uExplode > 0.001) {
+    vec3 dirE = normalize(p + 0.0001);
+    p += dirE * uExplode * 0.28;
+  }
+
   float yaw = uMouse.x * 0.34 + uTime * 0.035;
   float pitch = -uMouse.y * 0.20 + sin(uTime * 0.11) * 0.03;
   vec3 vp = (rotX(pitch) * rotY(yaw) * vec4(p, 1.0)).xyz;
   vp.z -= 4.6;
 
   float persp = 1.0 / max(0.25, -vp.z);
-  gl_Position = vec4(vp.x * persp * 1.9, vp.y * persp * 1.9, vp.z * -0.02, 1.0);
+  float zoom = 1.9 * (1.0 - uBurst * 0.30 - uExplode * 0.12);
+  gl_Position = vec4(vp.x * persp * zoom, vp.y * persp * zoom, vp.z * -0.02, 1.0);
 
   float sizeJitter = 0.55 + 0.85 * h2;
   float boost = smoothstep(0.0, 0.001, uVel * 0.0 + 1.0);
@@ -227,6 +254,8 @@ void main(){
   float dist = clamp((-vp.z - 2.2) / 4.5, 0.0, 1.0);
   float shapeAlpha = (uShapeB > 7.5 || uShapeA > 7.5) ? 1.0 : 1.0;
   vAlpha = (0.55 + 0.45 * h3) * (1.0 - dist * 0.72) * shapeAlpha;
+  vAlpha = min(1.0, vAlpha + uBurst * 0.55);
+  vColor += vec3(0.12, 0.10, 0.06) * uBurst;
 
   // lampi: alcune particelle pulsano
   float pulse = step(0.985, fract(h2 * 511.0)) * (0.5 + 0.5 * sin(uTime * 3.0 + h3 * 40.0));
@@ -328,7 +357,14 @@ void main(){
     gl.shaderSource(sh, src);
     gl.compileShader(sh);
     if (!gl.getShaderParameter(sh, gl.COMPILE_STATUS)) {
-      console.error(gl.getShaderInfoLog(sh));
+      const log = gl.getShaderInfoLog(sh);
+      console.error('[SPECCHIO] shader non compilato:', log);
+      if (window.__SPECCHIO_DEBUG) {
+        const pre = document.createElement('pre');
+        pre.style.cssText = 'position:fixed;z-index:9999;left:0;top:0;color:#f66;font:11px monospace;background:#000c;padding:12px;max-height:45vh;overflow:auto';
+        pre.textContent = (type === gl.VERTEX_SHADER ? 'VERTEX\n' : 'FRAGMENT\n') + log;
+        document.body.appendChild(pre);
+      }
       return null;
     }
     return sh;
@@ -385,6 +421,8 @@ void main(){
     size: gl.getUniformLocation(progParticles, 'uSize'),
     spread: gl.getUniformLocation(progParticles, 'uSpread'),
     tint: gl.getUniformLocation(progParticles, 'uTint'),
+    burst: gl.getUniformLocation(progParticles, 'uBurst'),
+    explode: gl.getUniformLocation(progParticles, 'uExplode'),
   };
   const B = {
     time: gl.getUniformLocation(progBg, 'uTime'),
@@ -412,6 +450,9 @@ void main(){
   const mouseS = { x: 0, y: 0 };
   const mouseL = { x: 0, y: 0 };
   let vel = 0;
+  let burst = 0;      // onda di transizione
+  let explode = 0;    // deformazione da scroll
+  let scrollEnergy = 0;
 
   function resize() {
     dpr = Math.min(window.devicePixelRatio || 1, 1.75);
@@ -435,6 +476,11 @@ void main(){
 
     mouseL.x = lerp(mouseL.x, state.mouseT.x, 0.045);
     mouseL.y = lerp(mouseL.y, state.mouseT.y, 0.045);
+
+    burst *= 0.935;
+    if (burst < 0.002) burst = 0;
+    scrollEnergy *= 0.90;
+    explode = Math.min(1, scrollEnergy * 0.35);
 
     if (mixT < 1) {
       mixT = Math.min(1, mixT + dt * 0.75);
@@ -485,6 +531,8 @@ void main(){
     gl.uniform1f(U.size, cur.size);
     gl.uniform1f(U.spread, cur.spread);
     gl.uniform1f(U.tint, cur.tint);
+    gl.uniform1f(U.burst, burst * burst * (3 - 2 * burst));
+    gl.uniform1f(U.explode, explode);
     gl.drawArrays(gl.POINTS, 0, COUNT);
 
     vel *= 0.92;
@@ -499,6 +547,7 @@ void main(){
       index = Math.max(0, Math.min(DIRECTION.length - 1, index|0));
       progress = p || 0;
       if (index !== targetIndex) {
+        burst = 1;
         prev = { shape: curShape, spread: cur.spread, size: cur.size, bg: cur.bg, tint: cur.tint };
         prevShape = curShape;
         target = DIRECTION[index];
@@ -513,7 +562,9 @@ void main(){
     },
     setScrollVel(v) {
       vel = Math.min(Math.abs(v) * 0.02, 3.0);
+      scrollEnergy = Math.min(1.6, Math.abs(v) * 0.006);
     },
+    burst() { burst = 1; },
   };
 
   resize();

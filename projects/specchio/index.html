@@ -15,21 +15,28 @@
 
 <!-- ══════════════════ PRELOADER ══════════════════ -->
 <div id="preloader" aria-hidden="true">
+  <canvas id="preFace"></canvas>
   <div class="pre-inner">
-    <div class="pre-mark">
-      <svg viewBox="0 0 100 100" class="pre-ring"><circle cx="50" cy="50" r="46"/></svg>
-      <div class="pre-pct"><span id="preNum">000</span></div>
-    </div>
+    <div class="pre-pct"><span id="preNum">000</span></div>
     <div class="pre-label mono">Inizializzazione della coscienza</div>
     <div class="pre-bar"><i id="preBar"></i></div>
     <div class="pre-words mono" id="preWords">carico i dati</div>
   </div>
+  <div class="pre-ring-wrap" aria-hidden="true"><svg viewBox="0 0 100 100" class="pre-ring"><circle cx="50" cy="50" r="46"/></svg></div>
 </div>
 
 <!-- ══════════════════ CURSORE ══════════════════ -->
 <div class="cursor" id="cursor" aria-hidden="true">
+  <span class="cursor-halo"></span>
   <div class="cursor-dot"></div>
   <div class="cursor-ring"><span class="cursor-label mono" id="cursorLabel"></span></div>
+</div>
+
+<!-- ══════════════════ CHAPTER CARD (cambio atto) ══════════════════ -->
+<div class="act-card" id="actCard" aria-hidden="true">
+  <span class="act-card-num" id="actCardNum">I</span>
+  <span class="act-card-line"></span>
+  <span class="act-card-name mono" id="actCardName">genesi</span>
 </div>
 
 <!-- ══════════════════ LUCE CHE SEGUE IL MOUSE ══════════════════ -->

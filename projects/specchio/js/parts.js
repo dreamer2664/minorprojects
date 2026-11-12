@@ -30,6 +30,115 @@
     io.observe(el);
   }
 
+
+  /* ══════════════════════════════════════════
+     PRELOADER — volto di punti che si dissolve
+     ══════════════════════════════════════════ */
+
+  (function preFace() {
+    const cv = document.getElementById('preFace');
+    if (!cv) return;
+    const ctx = cv.getContext('2d');
+    let W = 2, H = 2, pts = [];
+    let dissolve = 0, targetDissolve = 0, on = true;
+
+    function makeParticles() {
+      const s = fit(cv);
+      W = s.w; H = s.h;
+      if (!W || !H) return;
+
+      // profilo stilizzato, riusato dall'atto vii
+      const P = new Path2D(
+        'M300 40 C190 40 142 96 138 160 C136 180 128 190 132 206 ' +
+        'C120 224 104 246 112 258 C116 266 132 262 134 270 ' +
+        'C126 276 124 284 134 290 C140 298 134 312 146 322 ' +
+        'C156 332 180 346 198 356 C206 362 208 376 206 392 ' +
+        'C204 404 180 410 120 420 L60 450 L390 450 ' +
+        'C392 420 356 408 336 400 C324 396 318 384 317 370 ' +
+        'C315 336 332 306 334 252 C342 228 354 152 341 102 ' +
+        'C334 72 318 46 300 40 Z'
+      );
+
+      const off = document.createElement('canvas');
+      const sc = 0.42;
+      off.width = 450 * sc; off.height = 450 * sc;
+      const o = off.getContext('2d');
+      o.scale(sc, sc); o.fillStyle = '#fff'; o.fill(P);
+      const data = o.getImageData(0, 0, off.width, off.height).data;
+
+      const edge = [], inner = [];
+      const w2 = off.width, h2 = off.height;
+      const a = (x, y) => (x < 0 || y < 0 || x >= w2 || y >= h2) ? 0 : data[(y * w2 + x) * 4 + 3];
+      for (let y = 0; y < h2; y++) {
+        for (let x = 0; x < w2; x++) {
+          if (a(x, y) > 110) {
+            const e = a(x + 1, y) <= 110 || a(x - 1, y) <= 110 || a(x, y + 1) <= 110 || a(x, y - 1) <= 110;
+            (e ? edge : inner).push([x, y]);
+          }
+        }
+      }
+
+      const hs = Math.min(W / (450 * sc), H / (450 * sc));
+      const ox = W / 2 - (225 * sc) * hs;
+      const oy = H / 2 - (240 * sc) * hs;
+
+      const N = 2600;
+      pts = [];
+      for (let i = 0; i < N; i++) {
+        const pool = Math.random() < 0.8 ? edge : (inner.length ? inner : edge);
+        const c = pool[(Math.random() * pool.length) | 0];
+        const tx = ox + c[0] * hs, ty = oy + c[1] * hs;
+        const ang = Math.random() * Math.PI * 2;
+        const dist = 20 + Math.random() * Math.max(W, H) * 0.55;
+        pts.push({
+          x: tx, y: ty, tx, ty,
+          dx: tx + Math.cos(ang) * dist,
+          dy: ty + Math.sin(ang) * dist,
+          r: 0.6 + Math.random() * 1.3,
+          d: Math.random(),
+          edge: pool === edge,
+        });
+      }
+    }
+
+    makeParticles();
+    let rt;
+    window.addEventListener('resize', () => { clearTimeout(rt); rt = setTimeout(makeParticles, 160); });
+
+    function draw(t) {
+      requestAnimationFrame(draw);
+      if (!on) return;
+      dissolve += (targetDissolve - dissolve) * 0.08;
+      ctx.clearRect(0, 0, W, H);
+      const e = dissolve * dissolve * (3 - 2 * dissolve);
+
+      for (let i = 0; i < pts.length; i++) {
+        const p = pts[i];
+        const local = Math.max(0, Math.min(1, (e - p.d * 0.45) / 0.55));
+        const le = local * local * (3 - 2 * local);
+        const x = p.tx + (p.dx - p.tx) * le;
+        const y = p.ty + (p.dy - p.ty) * le + Math.sin(t * 0.0012 + i) * 2 * le;
+        const alpha = p.edge ? 0.9 : 0.45;
+        const fade = 1 - le * 0.95;
+        ctx.fillStyle = p.edge
+          ? `rgba(240,223,180,${(alpha * fade).toFixed(3)})`
+          : `rgba(232,228,220,${(alpha * fade * 0.7).toFixed(3)})`;
+        const rr = p.r * (1 + le * 1.6);
+        ctx.fillRect(x, y, rr, rr);
+      }
+    }
+    requestAnimationFrame(draw);
+
+    const io = new IntersectionObserver((es) => {
+      es.forEach((en) => { on = en.isIntersecting; });
+    });
+    io.observe(cv);
+
+    window.SpecchioPreFace = {
+      dissolve(v) { targetDissolve = Math.max(0, Math.min(1, v)); },
+    };
+  })();
+
   /* ══════════════════════════════════════════
      ATTO 00 — occhio ASCII
      ══════════════════════════════════════════ */

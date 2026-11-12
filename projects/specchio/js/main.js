@@ -40,6 +40,48 @@
   }
 
   /* ══════════════════════════════════════════════
+     DECODE TEXT — cifrario che si risolve
+     ══════════════════════════════════════════════ */
+
+  const GLYPHS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789/\\<>[]{}#*+%';
+  const decodeRuns = new WeakMap();
+
+  function decodeText(el, opts) {
+    if (!el) return;
+    const o = opts || {};
+    const target = o.text != null ? String(o.text) : el.textContent;
+    if (reduce) { el.textContent = target; return; }
+    if (decodeRuns.has(el)) cancelAnimationFrame(decodeRuns.get(el).raf);
+
+    const speed = o.speed || 1;                 // >1 = più veloce
+    const total = Math.max(260, Math.min(1500, target.length * (16 / speed)));
+    const start = performance.now();
+    const lockAt = (i) => (i / Math.max(1, target.length)) * total * 0.72;
+
+    function frame(now) {
+      const t = now - start;
+      let out = '';
+      for (let i = 0; i < target.length; i++) {
+        const ch = target[i];
+        if (ch === ' ' || ch === '·' || ch === '/' || ch === '—') { out += ch; continue; }
+        if (t >= lockAt(i)) out += ch;
+        else out += GLYPHS[(Math.random() * GLYPHS.length) | 0];
+      }
+      el.textContent = out;
+      if (t < total) {
+        const st = decodeRuns.get(el) || {};
+        st.raf = requestAnimationFrame(frame);
+        decodeRuns.set(el, st);
+      } else {
+        el.textContent = target;
+        decodeRuns.delete(el);
+      }
+    }
+    const st = { raf: requestAnimationFrame(frame) };
+    decodeRuns.set(el, st);
+  }
+
+  /* ══════════════════════════════════════════════
      SPLIT TEXT (parole + caratteri)
      ══════════════════════════════════════════════ */
 
@@ -72,6 +114,13 @@
   /* ══════════════════════════════════════════════
      CURSORE + LUCE
      ══════════════════════════════════════════════ */
+
+  // parole fantasma: prima di spezzare il testo in caratteri
+  (function ghostWords() {
+    $$('.dream-title .it2').forEach((el) => {
+      el.dataset.ghost = el.textContent.trim();
+    });
+  })();
 
   const cursor = $('#cursor');
   const cursorLabel = $('#cursorLabel');
@@ -291,16 +340,23 @@
       },
     });
     tl.to(obj, {
-      v: 100, duration: 2.5, ease: 'power2.inOut',
+      v: 100, duration: 2.9, ease: 'power2.inOut',
       onUpdate: () => {
         const v = Math.round(obj.v);
         preNum.textContent = String(v).padStart(3, '0');
         preBar.style.transform = `scaleX(${v / 100})`;
         preWords.textContent = WORDS[Math.min(WORDS.length - 1, Math.floor((v / 100) * WORDS.length))];
+        // il volto si dissolve man mano che il sistema "si carica"
+        if (window.SpecchioPreFace) {
+          window.SpecchioPreFace.dissolve(Math.max(0, (v - 62) / 38) * 0.85);
+        }
       },
     }, 0)
-    .fromTo('.pre-mark', { scale: 0.9, opacity: 0 }, { scale: 1, opacity: 1, duration: 1.1, ease: 'expo.out' }, 0)
-    .to('.pre-inner', { y: -24, opacity: 0, duration: 0.7, ease: 'power2.in' }, '+=0.15');
+    .fromTo('.pre-ring-wrap', { scale: 0.86, opacity: 0, rotate: -16 }, { scale: 1, opacity: 0.5, rotate: 0, duration: 1.6, ease: 'expo.out' }, 0)
+    .fromTo('.pre-inner', { opacity: 0, y: 16 }, { opacity: 1, y: 0, duration: 0.9, ease: 'expo.out' }, 0.25)
+    .to('.pre-ring-wrap', { scale: 1.5, opacity: 0, duration: 1.1, ease: 'power2.in' }, 2.15)
+    .to('.pre-inner', { y: -18, opacity: 0, duration: 0.55, ease: 'power2.in' }, 2.5)
+    .to('#preFace', { opacity: 0, duration: 0.7, ease: 'power2.in' }, 2.5);
   }
 
   /* ══════════════════════════════════════════════
@@ -331,13 +387,15 @@
     const allChars = [];
     titleWords.forEach((w) => allChars.push(...splitChars(w)));
 
-    gsap.set(allChars, { yPercent: 118, rotateX: -42, opacity: 0 });
+    gsap.set(allChars, { yPercent: 130, rotateX: -55, opacity: 0, filter: 'blur(9px)' });
     gsap.set('.hero-sub, .kicker, .hero-coords, .scroll-cue', { opacity: 0 });
+    gsap.set('.hero-wrap', { scale: 1.025, transformOrigin: '50% 62%' });
 
     const tl = gsap.timeline({ delay: 0.15 });
-    tl.to(allChars, {
-      yPercent: 0, rotateX: 0, opacity: 1,
-      duration: 1.5, ease: 'expo.out', stagger: 0.026,
+    tl.to('.hero-wrap', { scale: 1, duration: 2.6, ease: 'expo.out' }, 0)
+    .to(allChars, {
+      yPercent: 0, rotateX: 0, opacity: 1, filter: 'blur(0px)',
+      duration: 1.65, ease: 'expo.out', stagger: 0.028,
     })
     .to('.hero-title ~ .hero-sub, .kicker', { opacity: 1, duration: 1.2, ease: 'power2.out' }, '-=1.0')
     .fromTo('.hero-sub', { y: 26 }, { y: 0, opacity: 1, duration: 1.2, ease: 'expo.out' }, '<')
@@ -346,7 +404,8 @@
     .fromTo('.hero-coords', { x: 18 }, { x: 0, opacity: 1, duration: 1, ease: 'power2.out' }, '-=0.8')
     .fromTo('.scroll-cue', { y: 18 }, { y: 0, opacity: 1, duration: 1, ease: 'power2.out' }, '-=0.9')
     .to('.letterbox.top', { height: 0, duration: 1.6, ease: 'expo.inOut' }, 0.1)
-    .to('.letterbox.bottom', { height: 0, duration: 1.6, ease: 'expo.inOut' }, 0.1);
+    .to('.letterbox.bottom', { height: 0, duration: 1.6, ease: 'expo.inOut' }, 0.1)
+    .call(() => decodeText($('.hero-tag span'), { speed: 1.1 }), null, 1.1);
 
     gsap.set('.letterbox', { height: 46 });
   }
@@ -381,6 +440,7 @@
     'specchio · tu',
   ];
   const NAMES = ['genesi', 'genesi', 'manifesto', 'materia', 'scacco', 'scala', 'specie', 'riflesso', 'prova', 'sogno', 'frase madre', 'controllo', 'principio', 'numeri', 'pausa', 'specchio'];
+  const ROMAN = ['0', 'I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X', 'XI', 'XII', 'XIII', 'XIV', 'XV'];
 
   const startTime = performance.now();
   setInterval(() => {
@@ -389,13 +449,45 @@
   }, 220);
 
   let currentScene = -1;
+  const actCard = $('#actCard');
+  const actCardNum = $('#actCardNum');
+  const actCardName = $('#actCardName');
+  let actCardTl = null;
+
+  function chapterCard(i) {
+    if (!actCard || !hasGSAP || reduce) return;
+    actCardNum.textContent = ROMAN[i];
+    actCardName.textContent = NAMES[i];
+    if (actCardTl) actCardTl.kill();
+    actCardTl = gsap.timeline();
+    actCardTl
+      .set(actCard, { display: 'flex' })
+      .fromTo(actCard.querySelector('.act-card-line'),
+        { scaleX: 0 }, { scaleX: 1, duration: 0.7, ease: 'expo.inOut' }, 0)
+      .fromTo([actCardNum, actCardName],
+        { opacity: 0, y: 14 },
+        { opacity: 1, y: 0, duration: 0.55, ease: 'expo.out', stagger: 0.05 }, 0.08)
+      .to([actCardNum, actCardName], { opacity: 0, y: -10, duration: 0.45, ease: 'power2.in' }, 1.15)
+      .to(actCard.querySelector('.act-card-line'),
+        { scaleX: 0, transformOrigin: 'right center', duration: 0.55, ease: 'expo.inOut' }, 1.15)
+      .set(actCard, { display: 'none' }, 1.75);
+  }
+
   function setScene(i) {
     if (i === currentScene) return;
+    const first = currentScene === -1;
     currentScene = i;
     if (window.SpecchioGL) window.SpecchioGL.setScene(i, 0);
-    if (hudScene) hudScene.textContent = String(i).padStart(2, '0') + ' / ' + NAMES[i];
+    if (hudScene) {
+      if (hasGSAP && !reduce && !first) {
+        decodeText(hudScene, { text: String(i).padStart(2, '0') + ' / ' + NAMES[i], speed: 1.3 });
+      } else {
+        hudScene.textContent = String(i).padStart(2, '0') + ' / ' + NAMES[i];
+      }
+    }
     if (hudSub) hudSub.textContent = SUBS[i];
     if (Sound.enabled) Sound.tick(660 + i * 40);
+    if (!first) chapterCard(i);
     if (i === 10 && !reduce) {
       const flash = $('#flash');
       flash.style.transition = 'opacity .07s';
@@ -453,6 +545,29 @@
     });
   }
 
+  function magnetic(selector, strength) {
+    if (reduce || innerWidth <= 760) return;
+    $$(selector).forEach((el) => {
+      const k = strength || 0.28;
+      let raf = null;
+      el.addEventListener('mousemove', (e) => {
+        const r = el.getBoundingClientRect();
+        const dx = (e.clientX - (r.left + r.width / 2)) * k;
+        const dy = (e.clientY - (r.top + r.height / 2)) * k;
+        cancelAnimationFrame(raf);
+        raf = requestAnimationFrame(() => {
+          el.style.transform = `translate(${dx.toFixed(1)}px,${dy.toFixed(1)}px)`;
+        });
+      });
+      el.addEventListener('mouseleave', () => {
+        cancelAnimationFrame(raf);
+        el.style.transform = '';
+        el.style.transition = 'transform .55s cubic-bezier(.16,1,.3,1)';
+        setTimeout(() => { el.style.transition = ''; }, 560);
+      });
+    });
+  }
+
   railDots.forEach((d) => {
     d.addEventListener('click', () => {
       const t = $(d.dataset.target);
@@ -479,12 +594,55 @@
       });
     });
     // titoli con split: entrata a caratteri
+    $$('.kicker').forEach((el) => {
+      const txt = el.textContent.trim();
+      gsap.set(el, { opacity: 1 });
+      ScrollTrigger.create({
+        trigger: el, start: 'top 92%', once: true,
+        onEnter: () => decodeText(el, { text: txt, speed: 0.9 }),
+      });
+    });
     $$('[data-split]').forEach((el) => {
       if (el.closest('.hero-title') || el.closest('.mother-phrase') || el.closest('.dream-title')) return;
       const chars = splitChars(el);
       gsap.from(chars, {
         yPercent: 110, opacity: 0, duration: 1.1, ease: 'expo.out', stagger: 0.014,
         scrollTrigger: { trigger: el, start: 'top 92%' },
+      });
+    });
+  }
+
+  /* ══════════════════════════════════════════════
+     ENTRATA / USCITA DELLE SEZIONI
+     Ogni atto entra con un leggero pull-back e esce affondando.
+     ══════════════════════════════════════════════ */
+
+  function sceneTransitions() {
+    if (!hasGSAP || reduce) return;
+    const PINNED = ['s1', 's3', 's5', 's7', 's10', 's14b'];
+    // il principio ha una coreografia a blocchi propria: non va spento in scroll
+    const SKIP_OUT = ['s12'];
+    $$('.scene').forEach((sec) => {
+      if (sec.id === 's0') return;
+      if (PINNED.includes(sec.id)) return;
+      const inner = sec.querySelector('.chess-wrap, .manifesto-inner, .numbers-wrap, .proof-wrap, .species-wrap, .dream-wrap, .control-wrap, .mirror-wrap, .mother-wrap');
+      if (!inner) return;
+      gsap.fromTo(inner,
+        { scale: 0.975, opacity: 0.62 },
+        {
+          scale: 1, opacity: 1,
+          ease: 'none',
+          scrollTrigger: {
+            trigger: sec, start: 'top 92%', end: 'top 58%', scrub: 0.4,
+          },
+        });
+      if (SKIP_OUT.includes(sec.id)) return;
+      gsap.to(inner, {
+        scale: 1.01, opacity: 0.18,
+        ease: 'none',
+        scrollTrigger: {
+          trigger: sec, start: 'bottom 24%', end: 'bottom 0%', scrub: 0.4,
+        },
       });
     });
   }
@@ -739,10 +897,18 @@
       if (Sound.enabled) Sound.tick(moveIndex % 2 === 0 ? 980 : 740);
     }
 
+    let zaps = [];
     function applyMove(m) {
+      const captured = board[m.to];
+      if (captured) {
+        const f = FILES.indexOf(m.to[0]), r = 8 - parseInt(m.to[1], 10);
+        zaps.push({ x: f * cell + cell / 2, y: r * cell + cell / 2, t: 0, gold: captured === captured.toLowerCase() });
+        if (Sound.enabled) Sound.tick(420);
+      }
       const piece = board[m.from];
       delete board[m.from];
-      board[m.to] = piece;
+      board[m.to] = captured ? null : piece;
+      if (captured) board[m.to] = piece;
       moveIndex++;
     }
 
@@ -790,6 +956,24 @@
         ctx.fillStyle = white ? 'rgba(236,232,223,.88)' : 'rgba(201,164,92,.92)';
         ctx.fillText(GLYPH[piece], f * cell + cell / 2, r * cell + cell / 2 + 1);
       });
+
+      // scintille delle catture
+      if (zaps.length) {
+        zaps = zaps.filter((z) => z.t < 1);
+        zaps.forEach((z) => {
+          z.t += 0.035;
+          const p = z.t;
+          for (let k = 0; k < 12; k++) {
+            const a = (k / 12) * Math.PI * 2 + p * 2.2;
+            const r = p * cell * 0.85;
+            const x = z.x + Math.cos(a) * r;
+            const y = z.y + Math.sin(a) * r;
+            const al = (1 - p) * 0.85;
+            ctx.fillStyle = z.gold ? `rgba(201,164,92,${al})` : `rgba(236,232,223,${al})`;
+            ctx.fillRect(x - 1, y - 1, 2.2, 2.2);
+          }
+        });
+      }
 
       // animazione
       if (anim) {
@@ -1247,6 +1431,7 @@
     document.body.classList.add('ready');
     heroIntro();
     genericReveals();
+    sceneTransitions();
     if (hasGSAP) {
       genesisScene();
       manifestoScene();
@@ -1264,6 +1449,8 @@
     controlScene();
     mirrorScene();
     band();
+    magnetic('.btn-ghost', 0.22);
+    magnetic('#soundToggle', 0.16);
     if (lenis) lenis.stop();
     runPreloader(() => {
       setScene(0);

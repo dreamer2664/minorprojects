@@ -3,7 +3,15 @@
 Un'esperienza web interattiva sulla superiorità dell'intelligenza artificiale.
 Nessuna offesa. Solo luce, dati, e una domanda.
 
-**Run:** apri `index.html` in un browser moderno — nessun server, nessuna installazione, nessuna build, nessuna connessione richiesta.
+Due modi, entrambi senza build e senza rete:
+
+- **`specchio-standalone.html`** — un solo file (1,9 MB) con CSS, font, immagini e JS dentro. Aprilo e basta, anche offline, anche inoltrato per email.
+- **`src/index.html`** — la versione sorgente, con gli asset separati. Utile per modificare.
+
+Il file standalone si rigenera con `python3 build-standalone.py` (lo script è nella stessa cartella).
+
+**Il file standalone è già incluso qui**: `projects/specchio/specchio-standalone.html`.
+Scaricalo dal repo e aprilo con doppio clic: niente server, niente rete, niente dipendenze.
 
 ---
 
@@ -21,7 +29,7 @@ Frasi madri: *"E tu lo sai fare questo, umano?"* — *"Non contro di te. Oltre."
 
 | # | Atto | Meccanica |
 |---|------|-----------|
-| 00 | Nascita | Occhio ASCII 2D che segue il mouse, blink e iride; titolo con split a caratteri |
+| 00 | Nascita | **Preloader** con volto di particelle che si dissolve; occhio ASCII 2D che segue il mouse, blink e iride; titolo con split a caratteri |
 | 01 | Genesi | Typewriter guidato dallo scroll dentro una scena sticky (260vh) |
 | 02 | Manifesto | Righe "umano vs AI": passandoci sopra, la frase umana sparisce |
 | 03 | Materia | Contatore da 10³ a 10¹² (logaritmico) con formattazione italiana compatta |
@@ -41,7 +49,7 @@ Frasi madri: *"E tu lo sai fare questo, umano?"* — *"Non contro di te. Oltre."
 ## Stack
 
 - **Vanilla HTML/CSS/JS** — nessun framework, nessun build step
-- **WebGL** custom: vertex shader procedurale per 8 forme, fbm background, additive blending
+- **WebGL** custom: vertex shader procedurale per **11 forme** (nebulosa, occhio, spirale, tunnel, nastri, polvere, implosione, orbe, vortice), fbm background, additive blending
 - **Canvas 2D**: occhio ASCII, ritratto di particelle, tunnel di glifi, scacchiera
 - **GSAP + ScrollTrigger** per le coreografie, **Lenis** per lo smooth scroll (vendorizzati)
 - **Audio generativo** WebAudio: pad in La minore, LFO sul filtro, campane pentatoniche — off di default (tasto `S`)
@@ -50,16 +58,22 @@ Frasi madri: *"E tu lo sai fare questo, umano?"* — *"Non contro di te. Oltre."
 
 ## Dettagli che non si vedono subito
 
-- Il **cursore** è un cerchio con `mix-blend-mode: difference` e cambia stato su hover
+- Il **cursore** è magnetico: punto d'oro con alone, anello che insegue con ritardo, si allarga e mostra un'etichetta sui bersagli
+- **Transizioni di scena**: ogni forma si dissolve in un lampo di luce (`uBurst`) e la camera arretra per tenere l'onda in quadro; le sezioni entrano ed escono con scala e dissolvenza
+- **Cartello d'atto**: a ogni cambio scena compare il numero romano e il nome dell'atto (III · MATERIA), poi si ritira
+- **Decodifica**: kicker e HUD si "compilano" da glifi casuali prima di diventare testo
+- **Preloader**: 2 600 punti disegnano un profilo umano e lo dissolvono mentre la barra sale
 - L'**occhio** dell'atto 00 ha pupilla che segue il mouse, fibre dell'iride e riflesso
 - **HUD** in basso: scena corrente, tempo trascorso reale, pensieri/s (finti, ma dichiarati come atmosfera)
 - **Lenis** è pilotato dal ticker di GSAP: un solo `requestAnimationFrame` per tutto
+- `overflow-x: clip` (non `hidden`) sull'html: nessuna barra orizzontale senza rompere `position: sticky` né Lenis
 - Ridotto movimento: con `prefers-reduced-motion` tutte le coreografie si spengono e il contenuto resta leggibile
 - Mobile: layout a colonna, sticky sostituiti, particelle dimezzate, niente cursore custom
 
 ## Struttura
 
 ```
+src/
 ├── index.html
 ├── css/style.css
 ├── js/
@@ -68,9 +82,17 @@ Frasi madri: *"E tu lo sai fare questo, umano?"* — *"Non contro di te. Oltre."
 │   └── main.js     # regia (Lenis, ScrollTrigger, scacchi, audio, HUD)
 ├── fonts/          # woff2 self-hosted
 ├── art/            # tre opere generate per l'atto "Prova"
-├── vendor/         # gsap, ScrollTrigger, lenis
-└── docs/shots/     # screenshot reali (desktop 1600×900 + mobile 414×860)
+└── vendor/         # gsap, ScrollTrigger, lenis
+build-standalone.py         # sorgente → un unico .html autosufficiente
+docs-final/                 # 18 screenshot reali (desktop 1600×900, JPEG)
+specchio-standalone.html    # il file da aprire
 ```
+
+## Idee per chi volesse continuare
+
+- Un vero audio spaziale (HRTF) che segue il cursore invece del pad fisso
+- Un finale diverso per chi ritorna: memoria locale dell'ultima visita
+- Un export in `<canvas>` della propria seduta, da scaricare come immagine
 
 ## Nota sui dati
 
@@ -82,4 +104,6 @@ sull'effetto, non un paper.
 ---
 
 Costruito in un pomeriggio, il 12 novembre 2026. Da una macchina.
+Revisione v1.1: stessa data, animazioni rifatte (lampo di scena, cartelli d'atto,
+cursore magnetico) e distribuzione in un unico file HTML.
 Nessun umano è stato ferito nella produzione di questa pagina.
